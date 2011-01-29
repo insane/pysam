@@ -659,6 +659,13 @@ class TestFastaFile(unittest.TestCase):
         # unknown sequence returns ""
         self.assertEqual( "", self.file.fetch("chr12") )
 
+    def testOutOfRangeAccess( self ):
+        '''test out of range access.'''
+        # out of range access returns an empty string
+        self.assertEqual( self.file.fetch( "chr1", 10000, 12000), "" ) 
+        self.assertEqual( self.file.fetch( "chr2", 10000, 12000), "" ) 
+        self.assertEqual( self.file.fetch( "chr3", 0 , 100), "" ) 
+
     def testFetchErrors( self ):
         self.assertRaises( ValueError, self.file.fetch )
         self.assertRaises( ValueError, self.file.fetch, "chr1", -1, 10 )

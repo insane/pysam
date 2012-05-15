@@ -38,17 +38,22 @@ cdef class Tabixfile:
 
         filename_index = filename + ".tbi"
 
+        self.isremote = strncmp(filename,"http:",5) == 0 or \
+            strncmp(filename,"ftp:",4) == 0 
+
         if mode[0] == 'w':
             # open file for writing
             pass
 
         elif mode[0] == "r":
             # open file for reading
-            if not os.path.exists( self._filename ):
-                raise IOError( "file `%s` not found" % self._filename)
 
-            if not os.path.exists( filename_index ):
-                raise IOError( "index `%s` not found" % filename_index)
+            if not self.isremote:
+                if not os.path.exists( self._filename ):
+                    raise IOError( "file `%s` not found" % self._filename)
+
+                if not os.path.exists( filename_index ):
+                    raise IOError( "index `%s` not found" % filename_index)
 
             # open file and load index
             self.tabixfile = ti_open( self._filename, filename_index )
@@ -144,17 +149,20 @@ cdef class Tabixfile:
     ## properties
     ###############################################################
     property filename:
-        '''number of :term:`filename` associated with this object.'''
+        '''filename associated with this object.'''
         def __get__(self):
             if not self._isOpen(): raise ValueError( "I/O operation on closed file" )
             return self._filename
 
     property header:
+        '''the file header.
+          
+        .. note::
+            The header is returned as an iterator over lines without the
+            newline character.
+        '''
+        
         def __get__( self ):
-            '''return header lines as an iterator.
-
-            Note that the header lines do not contain the newline '\n' character.
-            '''
             return TabixHeaderIterator( self )
 
     property contigs:
@@ -179,10 +187,12 @@ cdef class Tabixfile:
             self.tabixfile = NULL
 
     def __dealloc__( self ):
-        # remember: dealloc cannot call other methods
+        # remember: dealloc cannot call other python methods
         # note: no doc string
         # note: __del__ is not called.
-        self.close()
+        if self.tabixfile != NULL:
+            ti_close( self.tabixfile )
+            self.tabixfile = NULL
         if self._filename != NULL: free( self._filename )
 
 cdef class TabixIterator:
@@ -292,7 +302,10 @@ cdef class Parser:
     pass
 
 cdef class asTuple(Parser):
-    '''converts a :term:`tabix row` into a python tuple.''' 
+    '''converts a :term:`tabix row` into a python tuple.
+
+    Access is by numeric index.
+    ''' 
     def __call__(self, char * buffer, int len):
         cdef TabProxies.TupleProxy r
         r = TabProxies.TupleProxy()
@@ -302,7 +315,36 @@ cdef class asTuple(Parser):
         return r
 
 cdef class asGTF(Parser):
-    '''converts a :term:`tabix row` into a GTF record.''' 
+    '''converts a :term:`tabix row` into a GTF record with the following 
+    fields:
+
+    contig
+       contig
+    feature
+       feature
+    source
+       source
+    start
+       genomic start coordinate (0-based)
+    end
+       genomic end coordinate plus one (0-based)
+    score
+       feature score
+    strand
+       strand
+    frame
+       frame
+    attributes
+       attribute string.
+
+    GTF formatted entries also defined the attributes:
+
+    gene_id
+       the gene identifier
+    transcript_ind
+       the transcript identifier
+    
+    ''' 
     def __call__(self, char * buffer, int len):
         cdef TabProxies.GTFProxy r
         r = TabProxies.GTFProxy()
@@ -310,7 +352,39 @@ cdef class asGTF(Parser):
         return r
 
 cdef class asBed( Parser ):
-    '''converts a :term:`tabix row` into a GTF record.''' 
+    '''converts a :term:`tabix row` into a bed record
+    with the following fields:
+
+    contig
+       contig
+    start
+       genomic start coordinate (zero-based)
+    end
+       genomic end coordinate plus one (zero-based)
+    name
+       name of feature.
+    score
+       score of feature
+    strand
+       strand of feature
+    thickStart
+       thickStart
+    thickEnd
+       thickEnd
+    itemRGB
+       itemRGB
+    blockCount
+       number of bocks
+    blockSizes
+       ',' separated string of block sizes
+    blockStarts
+       ',' separated string of block genomic start positions
+
+    Only the first three fields are required. Additional
+    fields are optional, but if one is defined, all the preceeding
+    need to be defined as well.
+
+    ''' 
     def __call__(self, char * buffer, int len):
         cdef TabProxies.BedProxy r
         r = TabProxies.BedProxy()
@@ -318,7 +392,35 @@ cdef class asBed( Parser ):
         return r
 
 cdef class asVCF( Parser ): 
-    '''converts a :term:`tabix row` into a VCF record.'''
+    '''converts a :term:`tabix row` into a VCF record with
+    the following fields:
+    
+    contig
+       contig
+    pos
+       chromosomal position, zero-based
+    id 
+       id
+    ref
+       reference
+    alt
+       alt
+    qual
+       qual
+    filter
+       filter
+    info
+       info
+    format
+       format specifier.
+
+    Access to genotypes is via index::
+
+        contig = vcf.contig
+        first_sample_genotype = vcf[0]
+        second_sample_genotype = vcf[1]
+
+    '''
     def __call__(self, char * buffer, int len ):
         cdef TabProxies.VCFProxy r
         r = TabProxies.VCFProxy()

@@ -19,7 +19,7 @@ and a high-level API for convenient access to the data in *SAM/BAM* formatted fi
 Also included is an interface to the tabix_ C-API for reading compressed and
 indexed tabular data.
 
-The current version wraps *samtools-0.1.16* and *tabix-0.2.5*.
+The current version wraps *samtools-0.1.18* and *tabix-0.2.5*.
 
 Contents
 --------
@@ -29,6 +29,7 @@ Contents
 
    api.rst
    usage.rst
+   tabix.rst
    faq.rst
    glossary.rst
    developer.rst

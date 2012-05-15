@@ -482,7 +482,8 @@ cdef int mate_callback( bam1_t *alignment, void *f):
 
 
 cdef class Samfile:
-    '''*(filename, mode=None, template = None, referencenames = None, referencelengths = None, text = NULL, header = None)*
+    '''*(filename, mode=None, template = None, referencenames = None, referencelengths = None, text = NULL, header = None,
+         add_sq_text = False )*
 
     A :term:`SAM`/:term:`BAM` formatted file. The file is automatically opened.
 
@@ -517,8 +518,9 @@ cdef class Samfile:
 
         3. If *text* is given, new header text is copied from raw text.
 
-        4. The names (*referencenames*) and lengths (*referencelengths*) are supplied directly as lists.
-
+        4. The names (*referencenames*) and lengths (*referencelengths*) are supplied directly as lists. 
+           By default, 'SQ' and 'LN' tags will be added to the header text. This option can be
+           changed by unsetting the flag *add_sq_text*. 
     '''
 
     def __cinit__(self, *args, **kwargs ):
@@ -548,6 +550,7 @@ cdef class Samfile:
                text = None,
                header = None,
                port = None,
+               add_sq_text = True,
               ):
         '''open a sam/bam file.
 
@@ -628,6 +631,13 @@ cdef class Samfile:
                     name = referencenames[x]
                     header_to_write.target_name[x] = <char*>calloc(len(name)+1, sizeof(char))
                     strncpy( header_to_write.target_name[x], name, len(name) )
+
+                # Optionally, if there is no text, add a SAM compatible header to output
+                # file.
+                if text is None and add_sq_text:
+                    text = ''
+                    for x from 0 <= x < header_to_write.n_targets:
+                        text += "@SQ\tSN:%s\tLN:%s\n" % (referencenames[x], referencelengths[x] )
 
                 if text != None:
                     # copy without \0
@@ -2920,9 +2930,9 @@ def _samtools_dispatch( method,
                         catch_stderr = False,
                         ):
     '''call ``method`` in samtools providing arguments in args.
-
-    .. note::
-       This method redirects stdout and stderr to capture it
+    
+    .. note:: 
+       This method redirects stdout and (optionally) stderr to capture it 
        from samtools. If for some reason stdout/stderr disappears
        the reason might be in this method.
 
@@ -2939,8 +2949,8 @@ def _samtools_dispatch( method,
     '''
 
     # note that debugging this module can be a problem
-    # as stdout/stderr will not appear
-
+    # as stdout/stderr will not appear on the terminal
+    
     # some special cases
     if method == "index":
         if not os.path.exists( args[0] ):
@@ -2964,7 +2974,6 @@ def _samtools_dispatch( method,
             if "-o" in args: raise ValueError("option -o is forbidden in samtools view")
             args = ( "-o", stdout_f ) + args
 
-
     # do the function call to samtools
     cdef char ** cargs
     cdef int i, n, retval
@@ -2978,6 +2987,7 @@ def _samtools_dispatch( method,
     cargs[0] = "samtools"
     cargs[1] = method
     for i from 0 <= i < n: cargs[i+2] = args[i]
+
     retval = pysam_dispatch(n+2, cargs)
     free( cargs )
 

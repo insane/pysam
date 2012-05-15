@@ -379,12 +379,39 @@ class TestVCF( TestParser ):
                 c[ncolumns+y] = "test_%i" % y
                 r[y] = "test_%i" % y
                 self.assertEqual( c[ncolumns+y], r[y] )
+
+class TestVCF( TestParser ):
+
+    filename = "example.vcf40.gz"
+
+    def testOpening( self ):
+        while 1:
+            infile = pysam.Tabixfile( self.filename )
+            infile.close()
+
                 
             # check strings
             ref_string = "\t".join( c )
             cmp_string = str(r)
             
             self.assertEqual( ref_string, cmp_string )
+
+class TestRemoteFileHTTP( unittest.TestCase):
+
+    url = "http://genserv.anat.ox.ac.uk/downloads/pysam/test/example.gtf.gz"
+    region = "chr1:1-1000"
+    local = "example.gtf.gz"
+
+    def testFetchAll( self ):
+        remote_file = pysam.Tabixfile(self.url, "r")  
+        remote_result = list(remote_file.fetch())
+        local_file = pysam.Tabixfile(self.local, "r")  
+        local_result = list(local_file.fetch())
+
+        self.assertEqual( len(remote_result), len(local_result) )
+        for x, y in zip(remote_result, local_result):
+            self.assertEqual( x, y )
+
 
 if __name__ == "__main__":
 
